@@ -1,13 +1,13 @@
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::keyboard::Keycode::H;
+
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
 use sdl2::video::Window;
 use std::fs::File;
 use std::io::Read;
-use std::time::Duration;
+
 
 static SP_OFFSET: u16 = 0;
 static PROGRAM_OFFSET: u16 = 0x200;
@@ -122,7 +122,7 @@ impl Chip8 {
     }
 
     fn fetch(&mut self) -> u16 {
-        let mut operation = 0;
+        let _operation = 0;
         let top_half = self.memory[self.registers.pc as usize] as u16;
         let bottom_half = self.memory[(self.registers.pc + 1) as usize] as u16;
         self.operand = (top_half << 8) | bottom_half;
@@ -135,7 +135,7 @@ impl Chip8 {
         let op1 = (operation & 0xF000) >> 12;
         let op2 = (operation & 0x0F00) >> 8;
         let op3 = (operation & 0x00F0) >> 4;
-        let op4 = (operation & 0x000F);
+        let op4 = operation & 0x000F;
 
         match (op1, op2, op3, op4) {
             (0, 0, 0, 0) => return,
@@ -158,14 +158,14 @@ impl Chip8 {
             (3, _, _, _) => {
                 let x = op2 as usize;
                 let nn = (operation & 0xFF) as u8;
-                if (self.registers.v[x] == nn) {
+                if self.registers.v[x] == nn {
                     self.registers.pc += 2;
                 }
             }
             (4, _, _, _) => {
                 let x = op2 as usize;
                 let nn = (operation & 0xFF) as u8;
-                if (self.registers.v[x] != nn) {
+                if self.registers.v[x] != nn {
                     self.registers.pc += 2;
                 }
             }
@@ -248,7 +248,7 @@ impl Chip8 {
             (9, _, _, 0) => {
                 let x = op2 as usize;
                 let y = op2 as usize;
-                if (self.registers.v[x] != self.registers.v[y]) {
+                if self.registers.v[x] != self.registers.v[y] {
                     self.registers.pc += 2;
                 }
             }
