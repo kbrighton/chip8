@@ -21,6 +21,7 @@ const WINDOW_WIDTH: u32 = (WIDTH as u32) * SCALE;
 const WINDOW_HEIGHT: u32 = (HEIGHT as u32) * SCALE;
 const TICKS_PER_FRAME: usize = 10;
 const STACK_SIZE: usize = 16;
+const NUM_KEYS: usize = 16;
 
 const FONTSET_SIZE: usize = 80;
 
@@ -48,8 +49,8 @@ struct Chip8 {
     timers: Timers,
     memory: [u8; 4096],
     screen: [bool; WIDTH * HEIGHT],
-    running: bool,
     operand: u16,
+    keys:[bool; NUM_KEYS],
     stack: [u16; STACK_SIZE],
 }
 
@@ -79,9 +80,9 @@ impl Chip8 {
             },
             memory: [0; 4096],
             screen: [false; WIDTH * HEIGHT],
-            running: true,
             operand: 0,
             stack: [0; STACK_SIZE],
+            keys: [false; NUM_KEYS],
         };
         emu.memory[..FONTSET_SIZE].copy_from_slice(&FONTSET);
 
@@ -95,10 +96,10 @@ impl Chip8 {
         self.registers.pc = PROGRAM_OFFSET;
         self.registers.v = [0; 16];
         self.registers.rpl = [0; 16];
-        self.running = true;
         self.operand = 0;
         self.screen = [false; WIDTH * HEIGHT];
         self.stack = [0; STACK_SIZE];
+        self.memory[..FONTSET_SIZE].copy_from_slice(&FONTSET);
     }
 
     fn push(&mut self, val: u16) {
@@ -115,6 +116,10 @@ impl Chip8 {
         let start = PROGRAM_OFFSET as usize;
         let end = (PROGRAM_OFFSET as usize) + data.len();
         self.memory[start..end].copy_from_slice(data);
+    }
+
+    fn keypress(&mut self, index: usize, pressed: bool) {
+        self.keys[index] = pressed;
     }
 
     fn clock(&mut self) {
@@ -296,6 +301,22 @@ impl Chip8 {
                     self.registers.v[0xF] = 0;
                 }
             },
+            (0xE,_,9,0xE) => {
+                let x = op2 as usize;
+                let v = self.registers.v[x];
+                let key = self.keys[v as usize];
+                if key {
+                    self.registers.pc +=2;
+                }
+            },
+            (0xE,_,0xA,1) => {
+                let x = op2 as usize;
+                let v = self.registers.v[x];
+                let key = self.keys[v as usize];
+                if !key {
+                    self.registers.pc +=2;
+                }
+            },
             (0xF,_,0,7) => {
                 let x = op2 as usize;
                 self.registers.v[x] = self.timers.delay;
@@ -387,7 +408,7 @@ impl Chip8 {
 
 fn main() -> Result<(), String> {
     let mut chip: Chip8 = Chip8::new();
-    let mut program = File::open("./SCTEST").expect("No File Found");
+    let mut program = File::open("./PONG").expect("No File Found");
     let mut buffer = Vec::new();
 
     program.read_to_end(&mut buffer).unwrap();
@@ -419,12 +440,22 @@ fn main() -> Result<(), String> {
                     ..
                 } => {
                     break 'running;
-                }
+                },
+                Event::KeyDown{keycode: Some(key), ..} => {
+                    if let Some(k) = button_translate(key) {
+                        chip.keypress(k, true);
+                    }
+                },
+                Event::KeyUp{keycode: Some(key), ..} => {
+                    if let Some(k) = button_translate(key) {
+                        chip.keypress(k, false);
+                    }
+                },
                 _ => {}
             }
         }
 
-        for _ in 0..10 {
+        for _ in 0..TICKS_PER_FRAME {
             chip.clock();
         }
         chip.update_timer();
@@ -450,4 +481,26 @@ fn update_screen(emu: &Chip8, canvas: &mut Canvas<Window>) {
         }
     }
     canvas.present();
+}
+
+fn button_translate(key: Keycode) -> Option<usize> {
+    match key {
+        Keycode::Num1 =>    Some(0x1),
+        Keycode::Num2 =>    Some(0x2),
+        Keycode::Num3 =>    Some(0x3),
+        Keycode::Num4 =>    Some(0xC),
+        Keycode::Q =>       Some(0x4),
+        Keycode::W =>       Some(0x5),
+        Keycode::E =>       Some(0x6),
+        Keycode::R =>       Some(0xD),
+        Keycode::A =>       Some(0x7),
+        Keycode::S =>       Some(0x8),
+        Keycode::D =>       Some(0x9),
+        Keycode::F =>       Some(0xE),
+        Keycode::Z =>       Some(0xA),
+        Keycode::X =>       Some(0x0),
+        Keycode::C =>       Some(0xB),
+        Keycode::V =>       Some(0xF),
+        _ =>                None,
+    }
 }
