@@ -8,6 +8,7 @@ use sdl2::video::Window;
 use std::fs::File;
 use std::io::Read;
 
+use rand::Rng;
 
 static SP_OFFSET: u16 = 0;
 static PROGRAM_OFFSET: u16 = 0x200;
@@ -260,6 +261,12 @@ impl Chip8 {
                 let nnn = operation & 0xFFF;
                 self.registers.pc = (self.registers.v[0] as u16) + nnn;
             }
+            (0xC,_,_,_) => {
+                let x = op2 as usize;
+                let nn = (operation & 0xFF) as u8;
+                let rng: u8 = rand::thread_rng().gen();
+                self.registers.v[x] = rng & nn;
+            }
             (0xD, _, _, _) => {
                 let x_coord = self.registers.v[op2 as usize] as u16;
                 let y_coord = self.registers.v[op3 as usize] as u16;
@@ -288,7 +295,36 @@ impl Chip8 {
                 } else {
                     self.registers.v[0xF] = 0;
                 }
-            }
+            },
+            (0xF,_,0,7) => {
+                let x = op2 as usize;
+                self.registers.v[x] = self.timers.delay;
+            },
+            (0xF,_,1,5) => {
+                let x = op2 as usize;
+                self.timers.delay = self.registers.v[x];
+            },
+            (0xF,_,1,8) => {
+                let x = op2 as usize;
+                self.timers.sound = self.registers.v[x];
+            },
+            (0xF,_,1,0xE) => {
+                let x = op2 as usize;
+                let new_x= self.registers.index.wrapping_add(self.registers.v[x] as u16);
+
+                let top_value = (new_x & 0xF000) >> 12;
+
+                self.registers.index = new_x;
+                if top_value > 0 {
+                    self.registers.v[0xF] = 1;
+                }
+
+            },
+            (0xF,_,2,9) => {
+                let x = op2 as usize;
+                let c = self.registers.v[x] as u16;
+                self.registers.index = c * 5;
+            },
             (0xF, _, 3, 3) => {
                 let x = op2 as usize;
                 let v = self.registers.v[x] as f32;
@@ -300,19 +336,33 @@ impl Chip8 {
                 self.memory[self.registers.index as usize] = hundreds;
                 self.memory[(self.registers.index + 1) as usize] = tens;
                 self.memory[(self.registers.index + 2) as usize] = ones;
-            }
+            },
             (0xF, _, 5, 5) => {
                 let x = op2 as usize;
                 let i = self.registers.index as usize;
                 for index in 0..=x {
                     self.memory[i + index] = self.registers.v[index];
                 }
-            }
+            },
             (0xF, _, 6, 5) => {
                 let x = op2 as usize;
                 let i = self.registers.index as usize;
                 for index in 0..=x {
                     self.registers.v[index] = self.memory[i + index];
+                }
+            }
+            (0xF, _,7,5) => {
+                let source = op2 as usize;
+                for counter in 0..source + 1
+                {
+                    self.registers.rpl[counter] = self.registers.v[counter];
+                }
+            }
+            (0xF, _,8,5) => {
+                let source = op2 as usize;
+                for counter in 0..source + 1
+                {
+                    self.registers.v[counter] = self.registers.rpl[counter];
                 }
             }
             (_, _, _, _) => unimplemented!("Unimplemented opcode: {:#04x}", operation),
@@ -337,7 +387,7 @@ impl Chip8 {
 
 fn main() -> Result<(), String> {
     let mut chip: Chip8 = Chip8::new();
-    let mut program = File::open("./test_opcode.ch8").expect("No File Found");
+    let mut program = File::open("./SCTEST").expect("No File Found");
     let mut buffer = Vec::new();
 
     program.read_to_end(&mut buffer).unwrap();
