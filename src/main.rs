@@ -341,7 +341,7 @@ impl Chip8 {
                 let x_coord = self.registers.v[op2 as usize] as u16;
                 let y_coord = self.registers.v[op3 as usize] as u16;
 
-                let mut rows = op4;
+                let rows = op4;
 
                 let mut flip = false;
 
