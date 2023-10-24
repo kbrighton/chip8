@@ -13,8 +13,11 @@ use rand::Rng;
 static SP_OFFSET: u16 = 0;
 static PROGRAM_OFFSET: u16 = 0x200;
 
-const WIDTH: usize = 64;
-const HEIGHT: usize = 32;
+const WIDTH: usize = 128;
+const HEIGHT: usize = 64;
+
+const LOWRES_WIDTH: usize = 64;
+const LOWRES_HEIGHT: usize = 32;
 
 const SCALE: u32 = 15;
 const WINDOW_WIDTH: u32 = (WIDTH as u32) * SCALE;
@@ -52,6 +55,7 @@ struct Chip8 {
     operand: u16,
     keys:[bool; NUM_KEYS],
     stack: [u16; STACK_SIZE],
+    hires: bool,
 }
 
 struct Registers {
@@ -83,10 +87,14 @@ impl Chip8 {
             operand: 0,
             stack: [0; STACK_SIZE],
             keys: [false; NUM_KEYS],
+            hires: false,
         };
         emu.memory[..FONTSET_SIZE].copy_from_slice(&FONTSET);
 
         emu
+    }
+    fn get_hires(&self) -> bool {
+        self.hires
     }
     fn reset(&mut self) {
         self.timers.delay = 0;
@@ -100,6 +108,7 @@ impl Chip8 {
         self.screen = [false; WIDTH * HEIGHT];
         self.stack = [0; STACK_SIZE];
         self.memory[..FONTSET_SIZE].copy_from_slice(&FONTSET);
+        self.hires = false;
     }
 
     fn push(&mut self, val: u16) {
@@ -137,6 +146,55 @@ impl Chip8 {
         self.operand
     }
 
+    fn draw_normal(&mut self, x_coord:u16, y_coord:u16, rows:u16) -> bool {
+        let width = if self.hires { WIDTH } else { LOWRES_WIDTH };
+        let height = if self.hires {HEIGHT} else { LOWRES_HEIGHT};
+        let mut flip=false;
+
+        for y_line in 0..rows {
+            let addr = self.registers.index + y_line as u16;
+            let pixels = self.memory[addr as usize];
+
+            for x_line in 0..8 {
+                if (pixels & (0b1000_0000 >> x_line)) != 0 {
+                    let x = (x_coord + x_line) as usize % width;
+                    let y = (y_coord + y_line) as usize % height;
+
+                    let index = x + width * y;
+                    flip |= self.screen[index];
+                    self.screen[index] ^= true;
+                }
+            }
+        }
+        flip
+    }
+
+    fn draw_extended(&mut self, x_coord:u16, y_coord:u16, rows:u16) -> bool {
+        let width = if self.hires { WIDTH } else { LOWRES_WIDTH };
+        let height = if self.hires {HEIGHT} else { LOWRES_HEIGHT};
+        let mut flip=false;
+
+        for y_line in 0..rows {
+            for x_byte in 0..2 {
+                let addr = self.registers.index + (y_line * 2) + x_byte as u16;
+                let pixels = self.memory[addr as usize];
+
+                for x_line in 0..8 {
+                    if (pixels & (0b1000_0000 >> x_line)) != 0 {
+                        let x = (x_coord + x_line + (x_byte *8)) as usize % width;
+                        let y = (y_coord + y_line) as usize % height;
+
+                        let index = x + width * y;
+                        flip |= self.screen[index];
+                        self.screen[index] ^= true;
+                    }
+                }
+            }
+        }
+        flip
+    }
+
+
     fn execute(&mut self, operation: u16) {
         let op1 = (operation & 0xF000) >> 12;
         let op2 = (operation & 0x0F00) >> 8;
@@ -151,7 +209,14 @@ impl Chip8 {
             (0, 0, 0xE, 0xE) => {
                 let return_addr = self.pop();
                 self.registers.pc = return_addr;
+            },
+            (0,0,0xF,0xE) => {
+                self.hires = false;
+            },
+            (0,0,0xF,0xF) => {
+                self.hires = true;
             }
+            (0,_,_,_) => return,
             (1, _, _, _) => {
                 let nnn = operation & 0xFFF;
                 self.registers.pc = nnn;
@@ -276,25 +341,16 @@ impl Chip8 {
                 let x_coord = self.registers.v[op2 as usize] as u16;
                 let y_coord = self.registers.v[op3 as usize] as u16;
 
-                let rows = op4;
+                let mut rows = op4;
 
                 let mut flip = false;
 
-                for y_line in 0..rows {
-                    let addr = self.registers.index + y_line as u16;
-                    let pixels = self.memory[addr as usize];
-
-                    for x_line in 0..8 {
-                        if (pixels & (0b1000_0000 >> x_line)) != 0 {
-                            let x = (x_coord + x_line) as usize % WIDTH;
-                            let y = (y_coord + y_line) as usize % HEIGHT;
-
-                            let index = x + WIDTH * y;
-                            flip |= self.screen[index];
-                            self.screen[index] ^= true;
-                        }
-                    }
+                if self.hires && rows ==0 {
+                    flip = self.draw_extended(x_coord, y_coord, 16);
+                } else {
+                    flip = self.draw_normal(x_coord,y_coord,rows);
                 }
+
                 if flip {
                     self.registers.v[0xF] = 1;
                 } else {
@@ -321,6 +377,21 @@ impl Chip8 {
                 let x = op2 as usize;
                 self.registers.v[x] = self.timers.delay;
             },
+            (0xF,_,0,0xA) => {
+                let x = op2 as usize;
+                let mut key = false;
+                for i in 0..self.keys.len() {
+                    if self.keys[i] {
+                        self.registers.v[x] = i as u8;
+                        key = true;
+                        break;
+                    }
+                }
+
+                if !key {
+                    self.registers.pc -=2;
+                }
+            }
             (0xF,_,1,5) => {
                 let x = op2 as usize;
                 self.timers.delay = self.registers.v[x];
@@ -345,6 +416,11 @@ impl Chip8 {
                 let x = op2 as usize;
                 let c = self.registers.v[x] as u16;
                 self.registers.index = c * 5;
+            },
+            (0xF,_,3,0) => {
+                let x = op2 as usize;
+                let c = self.registers.v[x] as u16;
+                self.registers.index = c * 10 + (FONTSET.len() as u16);
             },
             (0xF, _, 3, 3) => {
                 let x = op2 as usize;
@@ -408,7 +484,7 @@ impl Chip8 {
 
 fn main() -> Result<(), String> {
     let mut chip: Chip8 = Chip8::new();
-    let mut program = File::open("./PONG").expect("No File Found");
+    let mut program = File::open("./gradsim.ch8").expect("No File Found");
     let mut buffer = Vec::new();
 
     program.read_to_end(&mut buffer).unwrap();
@@ -468,13 +544,14 @@ fn main() -> Result<(), String> {
 fn update_screen(emu: &Chip8, canvas: &mut Canvas<Window>) {
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     canvas.clear();
+    let width = if emu.get_hires() { WIDTH } else { LOWRES_WIDTH };
 
     let screen_buf = emu.get_screen_buf();
     canvas.set_draw_color(Color::RGB(255, 255, 255));
     for (i, pixel) in screen_buf.iter().enumerate() {
         if *pixel {
-            let x = (i % WIDTH) as u32;
-            let y = (i / WIDTH) as u32;
+            let x = (i % width) as u32;
+            let y = (i / width) as u32;
 
             let rect = Rect::new((x * SCALE) as i32, (y * SCALE) as i32, SCALE, SCALE);
             canvas.fill_rect(rect).unwrap();
