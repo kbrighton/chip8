@@ -276,7 +276,7 @@ impl Chip8 {
             (7, _, _, _) => {
                 let x = op2 as usize;
                 let nn = (operation & 0xFF) as u8;
-                self.registers.v[x] = self.registers.v[x] + nn;
+                self.registers.v[x] = self.registers.v[x].wrapping_add(nn);
             }
             (8, _, _, 0) => {
                 let x = op2 as usize;
@@ -497,7 +497,7 @@ impl Chip8 {
 
 fn main() -> Result<(), String> {
     let mut chip: Chip8 = Chip8::new();
-    let mut program = File::open("./8ceattourny_d1.ch8").expect("No File Found");
+    let mut program = File::open("./gradsim.ch8").expect("No File Found");
     let mut buffer = Vec::new();
 
     program.read_to_end(&mut buffer).unwrap();
