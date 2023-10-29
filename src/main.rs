@@ -58,6 +58,73 @@ struct Chip8 {
     keys:[bool; NUM_KEYS],
     stack: [u16; STACK_SIZE],
     hires: bool,
+    quirks: Quirks,
+}
+
+struct Quirks {
+    shift_quirks: bool,
+    load_store_quirks: bool,
+    clip_quirks: bool,
+    jump_quirks: bool,
+    logic_quirks: bool,
+    v_blank_quirks: bool,
+    max_size: u16
+}
+
+impl Quirks {
+    fn new() -> Self {
+        let mut quirks = Self {
+            shift_quirks: false,
+            load_store_quirks: false,
+            clip_quirks: true,
+            jump_quirks: false,
+            logic_quirks: true,
+            v_blank_quirks: true,
+            max_size: 3232
+        };
+        quirks
+    }
+    fn get_chip(&mut self,chip: &str) {
+        match chip {
+            "chip8" => {
+                self.shift_quirks = false;
+                self.load_store_quirks = false;
+                self.clip_quirks = true;
+                self.jump_quirks = false;
+                self.logic_quirks = true;
+                self.v_blank_quirks = true;
+                self.max_size = 3232
+            },
+            "schip" => {
+                self.shift_quirks = true;
+                self.load_store_quirks = true;
+                self.clip_quirks = true;
+                self.jump_quirks = true;
+                self.logic_quirks = false;
+                self.v_blank_quirks = false;
+                self.max_size = 3583;
+            },
+            "xo" => {
+                self.shift_quirks = true;
+                self.load_store_quirks = true;
+                self.clip_quirks = true;
+                self.jump_quirks = true;
+                self.logic_quirks = false;
+                self.v_blank_quirks = false;
+                self.max_size = 65024;
+            }
+            _ => {
+                self.shift_quirks = false;
+                self.load_store_quirks = false;
+                self.clip_quirks = true;
+                self.jump_quirks = false;
+                self.logic_quirks = true;
+                self.v_blank_quirks = true;
+                self.max_size = 3232;
+            }
+        }
+    }
+
 }
 
 struct Registers {
@@ -90,6 +157,7 @@ impl Chip8 {
             stack: [0; STACK_SIZE],
             keys: [false; NUM_KEYS],
             hires: false,
+            quirks: Quirks::new()
         };
         emu.memory[..FONTSET_SIZE].copy_from_slice(&FONTSET);
 
@@ -292,17 +360,26 @@ impl Chip8 {
                 let x = op2 as usize;
                 let y = op3 as usize;
                 self.registers.v[x] |= self.registers.v[y];
+                if self.quirks.logic_quirks {
+                    self.registers.v[0xF] = 0;
+                }
             }
             (8, _, _, 2) => {
                 let x = op2 as usize;
                 let y = op3 as usize;
                 self.registers.v[x] &= self.registers.v[y];
+                if self.quirks.logic_quirks {
+                    self.registers.v[0xF] = 0;
+                }
             }
             (8, _, _, 3) => {
 
                 let x = op2 as usize;
                 let y = op3 as usize;
                 self.registers.v[x] ^= self.registers.v[y];
+                if self.quirks.logic_quirks {
+                    self.registers.v[0xF] = 0;
+                }
             }
             (8, _, _, 4) => {
                 let x = op2 as usize;
@@ -326,6 +403,13 @@ impl Chip8 {
             }
             (8, _, _, 6) => {
                 let x = op2 as usize;
+                let y = op3 as usize;
+
+
+                if !self.quirks.shift_quirks {
+                    self.registers.v[x] = self.registers.v[y]
+                }
+
                 let lsb = self.registers.v[x] & 1;
 
                 self.registers.v[x] >>= 1;
@@ -343,6 +427,12 @@ impl Chip8 {
 
             (8, _, _, 0xE) => {
                 let x = op2 as usize;
+                let y = op3 as usize;
+
+                if !self.quirks.shift_quirks {
+                    self.registers.v[x] = self.registers.v[y]
+                }
+
                 let msb = (self.registers.v[x] >> 7) & 1;
                 self.registers.v[x] <<= 1;
                 self.registers.v[0xF] = msb;
@@ -361,7 +451,15 @@ impl Chip8 {
             }
             (0xB, _, _, _) => {
                 let nnn = operation & 0xFFF;
-                self.registers.pc = (self.registers.v[0] as u16) + nnn;
+
+                if self.quirks.jump_quirks {
+                    let register:usize = (nnn >> 8) as usize;
+                    self.registers.pc = (self.registers.v[register] as u16) + nnn;
+                } else {
+                    self.registers.pc = (self.registers.v[0] as u16) + nnn;
+                }
+
+
             }
             (0xC,_,_,_) => {
                 let x = op2 as usize;
@@ -465,12 +563,18 @@ impl Chip8 {
                 for index in 0..=x {
                     self.memory[i + index] = self.registers.v[index];
                 }
+                if(!self.quirks.load_store_quirks) {
+                    self.registers.index = (self.registers.index + 1);
+                }
             },
             (0xF, _, 6, 5) => {
                 let x = op2 as usize;
                 let i = self.registers.index as usize;
                 for index in 0..=x {
                     self.registers.v[index] = self.memory[i + index];
+                }
+                if(!self.quirks.load_store_quirks) {
+                    self.registers.index = (self.registers.index + 1);
                 }
             }
             (0xF, _,7,5) => {
@@ -509,12 +613,13 @@ impl Chip8 {
 
 fn main() -> Result<(), String> {
     let mut chip: Chip8 = Chip8::new();
-    let mut program = File::open("./4-flags.ch8").expect("No File Found");
+    let mut program = File::open("./5-quirks.ch8").expect("No File Found");
     let mut buffer = Vec::new();
 
     program.read_to_end(&mut buffer).unwrap();
 
     chip.load_rom(&buffer);
+    chip.quirks.get_chip("schip");
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video().unwrap();
