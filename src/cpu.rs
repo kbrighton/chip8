@@ -93,10 +93,10 @@ impl Quirks {
                 self.max_size = 3583;
             },
             "xo" => {
-                self.shift_quirks = true;
-                self.load_store_quirks = true;
-                self.clip_quirks = true;
-                self.jump_quirks = true;
+                self.shift_quirks = false;
+                self.load_store_quirks = false;
+                self.clip_quirks = false;
+                self.jump_quirks = false;
                 self.logic_quirks = false;
                 self.v_blank_quirks = false;
                 self.max_size = 65024;
