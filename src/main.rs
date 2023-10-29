@@ -272,12 +272,11 @@ impl Chip8 {
                         }
                     }
 
-
                     if !source {
                         continue;
                     }
 
-                    let x = (x_coord + x_line) as usize % width;
+                    let x = (x_coord + x_line + (x_byte * 8)) as usize % width;
                     let y = (y_coord + y_line) as usize % height;
                     flip |= self.screen[y][x];
                     self.screen[y][x] ^= true;
@@ -317,11 +316,35 @@ impl Chip8 {
                 self.registers.pc = return_addr;
             },
             (0,0,0xF,0xB) => {
-                println!("Stub: 00FB");
+                let _width = if self.hires { WIDTH } else { LOWRES_WIDTH };
+                let height = if self.hires { HEIGHT } else {LOWRES_HEIGHT};
 
+                for i in 0..height {
+                    let row = self.screen[i];
+                    for clean in 0..4 {
+                        self.screen[i][clean] = false;
+                    }
+
+                    for j in 4.._width {
+                        self.screen[i][j] = row[j-4];
+                    }
+                }
             },
             (0,0,0xF,0xC) => {
-                println!("Stub: 00FB");
+                let _width = if self.hires { WIDTH } else { LOWRES_WIDTH };
+                let height = if self.hires { HEIGHT } else {LOWRES_HEIGHT};
+
+                for i in 0..height {
+                    let row = self.screen[i];
+                    for j in 0..(_width -4) {
+                        self.screen[i][j] = row[j+4];
+                    }
+
+                    for clean in _width-4.._width {
+                        self.screen[i][clean] = false;
+                    }
+
+                }
 
             },
             (0,0,0xF,0xE) => {
