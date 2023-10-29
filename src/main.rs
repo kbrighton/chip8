@@ -73,7 +73,7 @@ struct Quirks {
 
 impl Quirks {
     fn new() -> Self {
-        let mut quirks = Self {
+        let quirks = Self {
             shift_quirks: false,
             load_store_quirks: false,
             clip_quirks: true,
@@ -233,8 +233,8 @@ impl Chip8 {
 
                 let mut source =(pixels & (0b1000_0000 >> x_line)) != 0;
 
-                if (self.quirks.clip_quirks) {
-                    if ((x_coord%width as u16)+x_line>=width as u16 || (y_coord%height as u16)+y_line>=height as u16) {
+                if self.quirks.clip_quirks {
+                    if (x_coord%width as u16)+x_line>=width as u16 || (y_coord%height as u16)+y_line>=height as u16 {
                         source = false;
                     }
                 }
@@ -267,8 +267,8 @@ impl Chip8 {
                 for x_line in 0..8 {
                     let mut source =(pixels & (0b1000_0000 >> x_line)) != 0;
 
-                    if (self.quirks.clip_quirks) {
-                        if ((x_coord%width as u16)+x_line>=width as u16 || (y_coord%height as u16)+y_line>=height as u16) {
+                    if self.quirks.clip_quirks {
+                        if (x_coord%width as u16)+x_line>=width as u16 || (y_coord%height as u16)+y_line>=height as u16 {
                             source = false;
                         }
                     }
@@ -299,7 +299,7 @@ impl Chip8 {
             (0, 0, 0, 0) => return,
             (0, 0, 0xC, _) => {
                 let length = op4 as usize;
-                let width = if self.hires { WIDTH } else { LOWRES_WIDTH };
+                let _width = if self.hires { WIDTH } else { LOWRES_WIDTH };
                 let height = if self.hires { HEIGHT } else {LOWRES_HEIGHT};
 
                 for i in (0..height - length).rev()  {
@@ -584,8 +584,8 @@ impl Chip8 {
                 for index in 0..=x {
                     self.memory[i + index] = self.registers.v[index];
                 }
-                if(!self.quirks.load_store_quirks) {
-                    self.registers.index = (self.registers.index + 1);
+                if !self.quirks.load_store_quirks {
+                    self.registers.index = self.registers.index + 1;
                 }
             },
             (0xF, _, 6, 5) => {
@@ -594,8 +594,8 @@ impl Chip8 {
                 for index in 0..=x {
                     self.registers.v[index] = self.memory[i + index];
                 }
-                if(!self.quirks.load_store_quirks) {
-                    self.registers.index = (self.registers.index + 1);
+                if !self.quirks.load_store_quirks {
+                    self.registers.index = self.registers.index + 1;
                 }
             }
             (0xF, _,7,5) => {
@@ -695,7 +695,7 @@ fn main() -> Result<(), String> {
 fn update_screen(emu: &Chip8, canvas: &mut Canvas<Window>) {
     canvas.set_draw_color(Color::RGBA(0, 0, 0,255));
     canvas.clear();
-    let width = if emu.get_hires() { WIDTH } else { LOWRES_WIDTH };
+    let _width = if emu.get_hires() { WIDTH } else { LOWRES_WIDTH };
 
     let screen_buf = emu.get_screen_buf();
     canvas.set_draw_color(Color::RGBA(255, 255, 255,255));
