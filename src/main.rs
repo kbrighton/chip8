@@ -211,10 +211,15 @@ impl Chip8 {
             (0, 0, 0xC, _) => {
                 let length = op4 as usize;
                 let width = if self.hires { WIDTH } else { LOWRES_WIDTH };
+                let height = if self.hires { HEIGHT } else {LOWRES_HEIGHT};
 
+                for i in (0..height - length).rev()  {
+                    self.screen[i+length] = self.screen[i];
+                }
 
-
-
+                for i in 0..length {
+                    self.screen[i] = [false;WIDTH];
+                }
             },
             (0, 0, 0xE, 0) => {
                 self.screen = [[false; WIDTH]; HEIGHT];
@@ -497,7 +502,7 @@ impl Chip8 {
 
 fn main() -> Result<(), String> {
     let mut chip: Chip8 = Chip8::new();
-    let mut program = File::open("./gradsim.ch8").expect("No File Found");
+    let mut program = File::open("./dodge.ch8").expect("No File Found");
     let mut buffer = Vec::new();
 
     program.read_to_end(&mut buffer).unwrap();
