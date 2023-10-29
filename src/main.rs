@@ -1,3 +1,4 @@
+use std::env;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
@@ -18,8 +19,6 @@ const HEIGHT: usize = 64;
 
 const LOWRES_WIDTH: usize = 64;
 const LOWRES_HEIGHT: usize = 32;
-
-const DEBUGGING: bool = true;
 
 const SCALE: u32 = 15;
 const WINDOW_WIDTH: u32 = (WIDTH as u32) * SCALE;
@@ -226,7 +225,7 @@ impl Chip8 {
 
 
         for y_line in 0..full_rows {
-            let addr = self.registers.index + y_line as u16;
+            let addr = self.registers.index + y_line;
             let pixels = self.memory[addr as usize];
 
             for x_line in 0..full_cols {
@@ -238,7 +237,6 @@ impl Chip8 {
                         source = false;
                     }
                 }
-
 
                 if !source {
                     continue;
@@ -254,10 +252,11 @@ impl Chip8 {
         flip
     }
 
-    fn draw_extended(&mut self, x_coord:u16, y_coord:u16, rows:u16) -> bool {
+    fn draw_extended(&mut self, x_coord:u16, y_coord:u16) -> bool {
         let width = if self.hires { WIDTH } else { LOWRES_WIDTH };
         let height = if self.hires {HEIGHT} else { LOWRES_HEIGHT};
         let mut flip=false;
+        let rows = 16;
 
         for y_line in 0..rows {
             for x_byte in 0..2 {
@@ -497,7 +496,7 @@ impl Chip8 {
                 self.registers.v[0xF]=0;
 
                 if self.hires && rows ==0 {
-                    flip = self.draw_extended(x_coord, y_coord, 16);
+                    flip = self.draw_extended(x_coord, y_coord);
                 } else {
                     flip = self.draw_normal(x_coord,y_coord,rows);
                 }
@@ -632,17 +631,25 @@ impl Chip8 {
     }
 }
 
-fn main() -> Result<(), String> {
+fn main() {
     let mut chip: Chip8 = Chip8::new();
-    let mut program = File::open("./5-quirks.ch8").expect("No File Found");
+
+    let args: Vec<_> = env::args().collect();
+    if args.len() != 3 {
+        println!("Usage: cargo run path/to/game chiptype");
+        return;
+    }
+
+    let mut program = File::open(&args[1]).expect("Unable to open file");
     let mut buffer = Vec::new();
+
 
     program.read_to_end(&mut buffer).unwrap();
 
     chip.load_rom(&buffer);
-    chip.quirks.get_chip("schip");
+    chip.quirks.get_chip(&args[2]);
 
-    let sdl_context = sdl2::init()?;
+    let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
     let window = video_subsystem
@@ -688,8 +695,6 @@ fn main() -> Result<(), String> {
         chip.update_timer();
         update_screen(&chip, &mut canvas);
     }
-
-    Ok(())
 }
 
 fn update_screen(emu: &Chip8, canvas: &mut Canvas<Window>) {
