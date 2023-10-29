@@ -316,6 +316,13 @@ impl Chip8 {
             (8, _, _, 5) => {
                 let x = op2 as usize;
                 let y = op3 as usize;
+
+                let (new_vx, borrow) = self.registers.v[x].overflowing_sub(self.registers.v[y]);
+                let new_vf = if borrow { 0 } else { 1 };
+
+                self.registers.v[x] = new_vx;
+                self.registers.v[0xF] = new_vf;
+
             }
             (8, _, _, 6) => {
                 let x = op2 as usize;
@@ -327,16 +334,16 @@ impl Chip8 {
             (8, _, _, 7) => {
                 let x = op2 as usize;
                 let y = op3 as usize;
-                let new_x = self.registers.v[y] as i8 - self.registers.v[x] as i8;
+                let (new_vx, borrow) = self.registers.v[y].overflowing_sub(self.registers.v[x]);
+                let new_vf = if borrow { 0 } else { 1 };
 
-                self.registers.v[x] = new_x as u8;
-                self.registers.v[0xF] = if new_x < 0 { 1 } else { 0 };
+                self.registers.v[x] = new_vx;
+                self.registers.v[0xF] = new_vf;
             }
 
             (8, _, _, 0xE) => {
                 let x = op2 as usize;
-                let msb = self.registers.v[x] & 0x80;
-
+                let msb = (self.registers.v[x] >> 7) & 1;
                 self.registers.v[x] <<= 1;
                 self.registers.v[0xF] = msb;
             }
@@ -502,7 +509,7 @@ impl Chip8 {
 
 fn main() -> Result<(), String> {
     let mut chip: Chip8 = Chip8::new();
-    let mut program = File::open("./dodge.ch8").expect("No File Found");
+    let mut program = File::open("./4-flags.ch8").expect("No File Found");
     let mut buffer = Vec::new();
 
     program.read_to_end(&mut buffer).unwrap();
