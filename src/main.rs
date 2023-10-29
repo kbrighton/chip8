@@ -224,19 +224,31 @@ impl Chip8 {
         let full_cols = if self.hires {8} else {8};
 
 
+
         for y_line in 0..full_rows {
             let addr = self.registers.index + y_line as u16;
             let pixels = self.memory[addr as usize];
 
             for x_line in 0..full_cols {
-                if (pixels & (0b1000_0000 >> x_line)) != 0 {
-                    let x = (x_coord + x_line) as usize % width;
-                    let y = (y_coord + y_line) as usize % height;
 
-                    let index = x + width * y;
-                    flip |= self.screen[y][x];
-                    self.screen[y][x] ^= true;
+                let mut source =(pixels & (0b1000_0000 >> x_line)) != 0;
+
+                if (self.quirks.clip_quirks) {
+                    if ((x_coord%width as u16)+x_line>=width as u16 || (y_coord%height as u16)+y_line>=height as u16) {
+                        source = false;
+                    }
                 }
+
+
+                if !source {
+                    continue;
+                }
+
+                let x = (x_coord + x_line) as usize % width;
+                let y = (y_coord + y_line) as usize % height;
+                flip |= self.screen[y][x];
+                self.screen[y][x] ^= true;
+
             }
         }
         flip
@@ -253,14 +265,23 @@ impl Chip8 {
                 let pixels = self.memory[addr as usize];
 
                 for x_line in 0..8 {
-                    if (pixels & (0b1000_0000 >> x_line)) != 0 {
-                        let x = (x_coord + x_line + (x_byte *8)) as usize % width;
-                        let y = (y_coord + y_line) as usize % height;
+                    let mut source =(pixels & (0b1000_0000 >> x_line)) != 0;
 
-                        let index = x + width * y;
-                        flip |= self.screen[y][x];
-                        self.screen[y][x] ^= true;
+                    if (self.quirks.clip_quirks) {
+                        if ((x_coord%width as u16)+x_line>=width as u16 || (y_coord%height as u16)+y_line>=height as u16) {
+                            source = false;
+                        }
                     }
+
+
+                    if !source {
+                        continue;
+                    }
+
+                    let x = (x_coord + x_line) as usize % width;
+                    let y = (y_coord + y_line) as usize % height;
+                    flip |= self.screen[y][x];
+                    self.screen[y][x] ^= true;
                 }
             }
         }
