@@ -193,7 +193,7 @@ impl Chip8 {
     }
 
     pub(crate) fn clock(&mut self) {
-        if(self.v_blank_wait && self.quirks.v_blank_quirks) {
+        if self.v_blank_wait && self.quirks.v_blank_quirks {
             return;
         }
         let operation = self.fetch();
@@ -525,7 +525,7 @@ impl Chip8 {
                     self.registers.v[0xF] = 0;
                 }
 
-                if(self.quirks.v_blank_quirks) {
+                if self.quirks.v_blank_quirks {
                     self.v_blank_wait = true;
                 }
 
