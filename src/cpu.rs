@@ -46,6 +46,7 @@ pub(crate) struct Chip8 {
     keys:[bool; NUM_KEYS],
     stack: [u16; STACK_SIZE],
     hires: bool,
+    v_blank_wait: bool,
     pub(crate) quirks: Quirks,
 }
 
@@ -93,10 +94,10 @@ impl Quirks {
                 self.max_size = 3583;
             },
             "xo" => {
-                self.shift_quirks = true;
-                self.load_store_quirks = true;
-                self.clip_quirks = true;
-                self.jump_quirks = true;
+                self.shift_quirks = false;
+                self.load_store_quirks = false;
+                self.clip_quirks = false;
+                self.jump_quirks = false;
                 self.logic_quirks = false;
                 self.v_blank_quirks = false;
                 self.max_size = 65024;
@@ -145,7 +146,8 @@ impl Chip8 {
             stack: [0; STACK_SIZE],
             keys: [false; NUM_KEYS],
             hires: false,
-            quirks: Quirks::new()
+            quirks: Quirks::new(),
+            v_blank_wait: false,
         };
         emu.memory[..FONTSET_SIZE].copy_from_slice(&FONTSET);
 
@@ -167,6 +169,7 @@ impl Chip8 {
         self.stack = [0; STACK_SIZE];
         self.memory[..FONTSET_SIZE].copy_from_slice(&FONTSET);
         self.hires = false;
+        self.v_blank_wait = false;
     }
 
     fn push(&mut self, val: u16) {
@@ -190,6 +193,9 @@ impl Chip8 {
     }
 
     pub(crate) fn clock(&mut self) {
+        if(self.v_blank_wait) {
+            return;
+        }
         let operation = self.fetch();
         self.execute(operation);
     }
@@ -518,6 +524,11 @@ impl Chip8 {
                 } else {
                     self.registers.v[0xF] = 0;
                 }
+
+                if(self.quirks.v_blank_quirks) {
+                    self.v_blank_wait = true;
+                }
+
             },
             (0xE,_,9,0xE) => {
                 let x = op2 as usize;
@@ -628,6 +639,7 @@ impl Chip8 {
     }
 
     pub(crate) fn update_timer(&mut self) {
+        self.v_blank_wait = false;
         if self.timers.delay > 0 {
             self.timers.delay -= 1;
         }

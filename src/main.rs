@@ -1,4 +1,5 @@
 mod cpu;
+mod timing;
 
 use std::env;
 use sdl2::event::Event;
@@ -10,7 +11,9 @@ use sdl2::render::Canvas;
 use sdl2::video::Window;
 use std::fs::File;
 use std::io::Read;
+use std::time::{Duration, Instant};
 use crate::cpu::Chip8;
+use crate::timing::{TimedSystem,Timing};
 
 const WIDTH: usize = 128;
 const HEIGHT: usize = 64;
@@ -22,6 +25,10 @@ const TICKS_PER_FRAME: usize = 20;
 
 const LOWRES_WIDTH: usize = 64;
 const LOWRES_HEIGHT: usize = 32;
+
+const CPU_SYSTEM: &str = "cpu";
+const TIMER_SYSTEM: &str = "timer";
+const DISPLAY_SYSTEM: &str = "display";
 
 fn main() {
     let mut chip: Chip8 = Chip8::new();
@@ -40,6 +47,15 @@ fn main() {
 
     chip.load_rom(&buffer);
     chip.quirks.get_chip(&args[2]);
+
+    let mut timing = Timing::new(
+        Instant::now(),
+        vec![
+            TimedSystem::new(CPU_SYSTEM, 700),
+            TimedSystem::new(TIMER_SYSTEM, 60),
+            TimedSystem::new(DISPLAY_SYSTEM, 60),
+        ],
+    );
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -81,11 +97,35 @@ fn main() {
             }
         }
 
-        for _ in 0..TICKS_PER_FRAME {
-            chip.clock();
+        // The rest of the game loop goes here...
+        let instructions = timing.get_instructions(Instant::now());
+        for instruction in instructions {
+            match instruction.name {
+                CPU_SYSTEM => {
+                    for _ in 0..instruction.cycles {
+                        chip.clock();
+                    }
+                },
+                TIMER_SYSTEM => {
+                    for _ in 0..instruction.cycles {
+                        chip.update_timer();
+                    }
+                },
+                DISPLAY_SYSTEM => {
+                    for _ in 0..instruction.cycles {
+                        update_screen(&chip,&mut canvas);
+                    }
+                },
+                unknown => panic!("Unexpected instruction {}", unknown),
+            }
         }
-        chip.update_timer();
-        update_screen(&chip, &mut canvas);
+        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60)); // 60fps
+
+//        for _ in 0..TICKS_PER_FRAME {
+//            chip.clock();
+//        }
+//        chip.update_timer();
+//        update_screen(&chip, &mut canvas);
     }
 }
 
