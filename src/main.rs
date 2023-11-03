@@ -121,11 +121,11 @@ fn main() {
         }
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60)); // 60fps
 
-//        for _ in 0..TICKS_PER_FRAME {
-//            chip.clock();
-//        }
-//        chip.update_timer();
-//        update_screen(&chip, &mut canvas);
+        // for _ in 0..TICKS_PER_FRAME {
+        //     chip.clock();
+        // }
+        // chip.update_timer();
+        // update_screen(&chip, &mut canvas);
     }
 }
 
