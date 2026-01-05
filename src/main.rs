@@ -2,13 +2,13 @@ mod cpu;
 mod timing;
 
 use std::env;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
+use sdl3::event::Event;
+use sdl3::keyboard::Keycode;
 
-use sdl2::pixels::Color;
-use sdl2::rect::Rect;
-use sdl2::render::Canvas;
-use sdl2::video::Window;
+use sdl3::pixels::Color;
+use sdl3::rect::Rect;
+use sdl3::render::Canvas;
+use sdl3::video::Window;
 use std::fs::File;
 use std::io::Read;
 use std::time::{Duration, Instant};
@@ -57,7 +57,7 @@ fn main() {
         ],
     );
 
-    let sdl_context = sdl2::init().unwrap();
+    let sdl_context = sdl3::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
     let window = video_subsystem
@@ -67,7 +67,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut canvas = window.into_canvas().present_vsync().build().unwrap();
+    let mut canvas = window.into_canvas();
 
     canvas.clear();
     canvas.present();
@@ -153,10 +153,10 @@ fn update_screen(emu: &Chip8, canvas: &mut Canvas<Window>) {
 
 fn button_translate(key: Keycode) -> Option<usize> {
     match key {
-        Keycode::Num1 =>    Some(0x1),
-        Keycode::Num2 =>    Some(0x2),
-        Keycode::Num3 =>    Some(0x3),
-        Keycode::Num4 =>    Some(0xC),
+        Keycode::_1 =>    Some(0x1),
+        Keycode::_2 =>    Some(0x2),
+        Keycode::_3 =>    Some(0x3),
+        Keycode::_4 =>    Some(0xC),
         Keycode::Q =>       Some(0x4),
         Keycode::W =>       Some(0x5),
         Keycode::E =>       Some(0x6),

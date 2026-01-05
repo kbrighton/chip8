@@ -6,6 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sdl2 = "*"
+sdl3 = "*"
 rand = { version = "*", features = [] }
 time = "*"
