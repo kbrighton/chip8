@@ -67,7 +67,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut canvas = window.into_canvas();
+    let mut canvas = sdl3::render::create_renderer(window, None).unwrap();
 
     canvas.clear();
     canvas.present();
