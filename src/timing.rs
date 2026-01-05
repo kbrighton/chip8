@@ -99,7 +99,7 @@ impl Timing {
             // Add it to our results
             debug!("Adding instruction {} for {} cycles", self.systems[0].name, num_cycles);
             results.push(Instruction {
-                name: self.systems[0].name.clone(),
+                name: self.systems[0].name,
                 cycles: num_cycles,
             });
 
